@@ -1,0 +1,27 @@
+﻿<?xml version='1.0' encoding='utf-8'?>
+<SettingsFile xmlns="http://schemas.microsoft.com/VisualStudio/2004/01/settings" CurrentProfile="(Default)" GeneratedClassNamespace="AOL_Logger.Properties" GeneratedClassName="Settings">
+  <Profiles />
+  <Settings>
+    <Setting Name="ConnectionString" Type="System.String" Scope="User">
+      <Value Profile="(Default)">user id = jksql; password=jksqls; server=(local); Trusted_Connection=yes; database=AOLLogger; connection timeout=60</Value>
+    </Setting>
+    <Setting Name="execution_hours" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">3</Value>
+    </Setting>
+    <Setting Name="execution_minutes" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">0</Value>
+    </Setting>
+    <Setting Name="days_between_aggregations" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">1</Value>
+    </Setting>
+    <Setting Name="hours_to_keep" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">48</Value>
+    </Setting>
+    <Setting Name="logFile" Type="System.String" Scope="User">
+      <Value Profile="(Default)">C:\AOLLogger.log.txt</Value>
+    </Setting>
+    <Setting Name="folderPrefix" Type="System.String" Scope="User">
+      <Value Profile="(Default)">AOL_</Value>
+    </Setting>
+  </Settings>
+</SettingsFile>

@@ -1,17 +1,15 @@
-﻿using System;
-using System.Linq;
-using Outlook = Microsoft.Office.Interop.Outlook;
-using System.Text.RegularExpressions;
+﻿using log4net;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Data.SqlClient;
 using System.Data;
-using System.Configuration;
-using System.IO;
+using System.Data.SqlClient;
+using System.Text.RegularExpressions;
+using Outlook = Microsoft.Office.Interop.Outlook;
 
 namespace AOL_Logger
 {
-    public partial class ThisAddIn
+    public partial class AOLLogger
     {
         private BackgroundWorker bgw;
         private SqlConnection myConnection;
@@ -24,16 +22,17 @@ namespace AOL_Logger
         private SqlParameter RecieptTimeParam;
 
         private string connectionString;
-        private int execution_hours;
-        private int execution_minutes;
-        private int DaysUntilAggregation;
+        private int ms_between_aggregations;
         private int HoursToKeep;
-        private string logFile;
         private string folderPrefix;
+
+        private static readonly ILog log = LogManager.GetLogger(
+            System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
         private void ThisAddIn_Startup(object sender, System.EventArgs e)
         {
             getConfigValues();
+            log4net.Config.XmlConfigurator.Configure();
             LaunchBackgroundLoggerService();
         }
 
@@ -42,26 +41,22 @@ namespace AOL_Logger
             KillBackgroundLoggerService();
         }
 
-        #region Private Helpers, Plugin logic 
+        #region Private Helpers, Plugin logic
 
         private void getConfigValues()
         {
             connectionString = Properties.Settings.Default.ConnectionString;
-            execution_hours = Properties.Settings.Default.execution_hours;
-            execution_minutes = Properties.Settings.Default.execution_minutes;
-            DaysUntilAggregation = Properties.Settings.Default.days_between_aggregations;
-            HoursToKeep = Properties.Settings.Default.hours_to_keep;
-            logFile = Properties.Settings.Default.logFile;
+            ms_between_aggregations = Properties.Settings.Default.ms_between_aggregations;
             folderPrefix = Properties.Settings.Default.folderPrefix;
-
+            HoursToKeep = Properties.Settings.Default.hours_to_keep;
         }
 
-        private void InstantiateSqlPreparedStatement( )
+        private void InstantiateSqlPreparedStatement()
         {
             preparedInsert = new SqlCommand("INSERT INTO AOLLogger.dbo.LoggedItems (Folder, Subject, Body, RecieptTime) VALUES (@Folder, @Subject, @Body, @RecieptTime)", myConnection);
             preparedDelete = new SqlCommand("DELETE FROM AOLLogger.dbo.LoggedItems WHERE RecieptTime < @DeleteTime", myConnection);
 
-            FolderParam = new SqlParameter("@Folder",SqlDbType.NVarChar,50);
+            FolderParam = new SqlParameter("@Folder", SqlDbType.NVarChar, 50);
             SubjectParam = new SqlParameter("@Subject", SqlDbType.NVarChar, 256);
             BodyParam = new SqlParameter("@Body", SqlDbType.NText, 8000);
             RecieptTimeParam = new SqlParameter("@RecieptTime", SqlDbType.DateTime);
@@ -79,8 +74,9 @@ namespace AOL_Logger
         {
             foreach (Outlook.Folder fol in topLevelFolder.Folders)
             {
+                log.Info(string.Format("Processing {0}", fol.Name));
                 //regex match
-                if (Regex.IsMatch(fol.Name, String.Format(@"{0}.*",folderPrefix)))
+                if (Regex.IsMatch(fol.Name, String.Format(@"{0}.*", folderPrefix)))
                 { //If this folder has an AOL_prefix then log the mail items contained and then delete them
                     DeleteAndLog(fol);
                 }
@@ -88,13 +84,13 @@ namespace AOL_Logger
             }
         }
 
-
         private void DeleteAndLog(Outlook.Folder folder)
         {
             int itemsLoggedInfolder = 0;
             string sourceFolder = folder.FolderPath;
             Stack<Outlook.MailItem> mailItems = new Stack<Outlook.MailItem>();
-            foreach( Outlook.MailItem mail in folder.Items ){
+            foreach (Outlook.MailItem mail in folder.Items)
+            {
                 try
                 {
                     string subject = mail.Subject;
@@ -109,32 +105,21 @@ namespace AOL_Logger
                 }
             }
             //Delete in reverse order
-            foreach(Outlook.MailItem mail in mailItems){
+            log.Info(string.Format("Deleting {0} items", mailItems.Count));
+            foreach (Outlook.MailItem mail in mailItems)
+            {
                 mail.Delete();
             }
-            System.Diagnostics.Debug.WriteLine("Records inserted in " + folder.Name + ": " + itemsLoggedInfolder);
+            log.Info(string.Format("Records inserted in {0}: {1}", folder.Name, itemsLoggedInfolder));
         }
 
         private void LogException(Exception e)
         {
-
-
-            try
-            {
-                StreamWriter sw = new StreamWriter(logFile);
-                sw.WriteLine(DateTime.Now + "\n" + e.Message + "\n" + e.StackTrace);
-                sw.Close();
-            }
-            catch (Exception ioException)
-            {
-
-            }
-
+            log.Error(string.Format("{0}\n{1}", e.Message, e.StackTrace));
         }
 
         private int LogEmail(string SourceFolder, string Subject, string Body, DateTime RecieptTime)
         {
-
             preparedInsert.Parameters[0].Value = SourceFolder;
             preparedInsert.Parameters[1].Value = Subject;
             preparedInsert.Parameters[2].Value = Body;
@@ -148,11 +133,10 @@ namespace AOL_Logger
         {
             preparedDelete.Parameters[0].Value = DeletionDay;
             preparedDelete.Prepare();
-            System.Diagnostics.Debug.WriteLine(preparedDelete.ExecuteNonQuery() + " Rows dropped from the database.");
+            log.Info(string.Format("{0} Rows dropped from the database.", preparedDelete.ExecuteNonQuery()));
         }
 
-        #endregion
-
+        #endregion Private Helpers, Plugin logic
 
         #region Bankground Worker Job Logic
 
@@ -167,7 +151,6 @@ namespace AOL_Logger
             {
                 bgw.RunWorkerAsync();
             }
-
         }
 
         private void KillBackgroundLoggerService()
@@ -180,44 +163,38 @@ namespace AOL_Logger
             BackgroundWorker worker = sender as BackgroundWorker;
             Outlook.Application thisOutlookApplication = new Outlook.Application();
 
-            DateTime executionTime = new DateTime(DateTime.Today.Year, DateTime.Today.Month, DateTime.Today.Day, execution_hours, execution_minutes, 0);
-
             myConnection = new SqlConnection(connectionString);
 
             while (true)
             {
-                if (worker.CancellationPending)
+                try
                 {
-                    e.Cancel = true;
-                    break;
-                }
-                else
-                {
-                    int milisecondsToWait = (int)((TimeSpan)(executionTime - DateTime.Now)).TotalMilliseconds;
-                    while (milisecondsToWait <= 0)
+                    if (worker.CancellationPending)
                     {
-                        executionTime = executionTime.AddDays(1);
-                        milisecondsToWait = (int)((TimeSpan)(executionTime - DateTime.Now)).TotalMilliseconds;
+                        e.Cancel = true;
+                        break;
                     }
-                    System.Threading.Thread.Sleep(milisecondsToWait);
-                    
-                    myConnection.Open();
+                    else
+                    {
+                        System.Threading.Thread.Sleep(ms_between_aggregations);
 
-                    InstantiateSqlPreparedStatement();
+                        myConnection.Open();
 
-                    HandleFolder(thisOutlookApplication.Session.DefaultStore.GetRootFolder() as Outlook.Folder);
+                        InstantiateSqlPreparedStatement();
 
-                    DeleteOldLoggedEmails( executionTime.AddHours(-1*HoursToKeep) );
+                        HandleFolder(thisOutlookApplication.Session.DefaultStore.GetRootFolder() as Outlook.Folder);
 
-                    myConnection.Close();
+                        DeleteOldLoggedEmails(DateTime.Now.AddHours(-1 * HoursToKeep));
 
-                    
+                        myConnection.Close();
+                    }
+                }
+                catch (Exception exception)
+                {
+                    log.Error("Worker thread level exception: " + exception.Message + "\n" + exception.StackTrace);
                 }
             }
         }
-
-        
-
 
         private void bw_ProgressChanged(object sender, ProgressChangedEventArgs e)
         {
@@ -242,8 +219,7 @@ namespace AOL_Logger
             }
         }
 
-        #endregion
-
+        #endregion Bankground Worker Job Logic
 
         #region VSTO generated code
 
@@ -256,7 +232,7 @@ namespace AOL_Logger
             this.Startup += new System.EventHandler(ThisAddIn_Startup);
             this.Shutdown += new System.EventHandler(ThisAddIn_Shutdown);
         }
-        
-        #endregion
+
+        #endregion VSTO generated code
     }
 }

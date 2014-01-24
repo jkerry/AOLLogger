@@ -38,42 +38,6 @@ namespace AOL_Logger.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("3")]
-        public int execution_hours {
-            get {
-                return ((int)(this["execution_hours"]));
-            }
-            set {
-                this["execution_hours"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("0")]
-        public int execution_minutes {
-            get {
-                return ((int)(this["execution_minutes"]));
-            }
-            set {
-                this["execution_minutes"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("1")]
-        public int days_between_aggregations {
-            get {
-                return ((int)(this["days_between_aggregations"]));
-            }
-            set {
-                this["days_between_aggregations"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("48")]
         public int hours_to_keep {
             get {
@@ -86,18 +50,6 @@ namespace AOL_Logger.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("C:\\AOLLogger.log.txt")]
-        public string logFile {
-            get {
-                return ((string)(this["logFile"]));
-            }
-            set {
-                this["logFile"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("AOL_")]
         public string folderPrefix {
             get {
@@ -105,6 +57,18 @@ namespace AOL_Logger.Properties {
             }
             set {
                 this["folderPrefix"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("600000")]
+        public int ms_between_aggregations {
+            get {
+                return ((int)(this["ms_between_aggregations"]));
+            }
+            set {
+                this["ms_between_aggregations"] = value;
             }
         }
     }

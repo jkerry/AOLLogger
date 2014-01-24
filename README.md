@@ -1,7 +1,7 @@
 AOLLogger
 =========
 
-An outlook extension to automatically save log e-mails in a local database and delete the local representation. Settings for time of execution, number of hours to keep historical logs, days between execution, etc are all configurable. 
+An outlook extension to automatically save log e-mails in a local database and delete the local representation. Settings for sleep duration, days to keep, and database are configurable.
 
 
 To use:

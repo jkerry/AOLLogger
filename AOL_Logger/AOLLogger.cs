@@ -70,7 +70,7 @@ namespace AOL_Logger
             preparedDelete.Parameters.Add(DeleteTimeParam);
         }
 
-        private void HandleFolder(Outlook.Folder topLevelFolder)
+        private void HandleFolder(SqlTransaction txn, Outlook.Folder topLevelFolder)
         {
             foreach (Outlook.Folder fol in topLevelFolder.Folders)
             {
@@ -78,13 +78,13 @@ namespace AOL_Logger
                 //regex match
                 if (Regex.IsMatch(fol.Name, String.Format(@"{0}.*", folderPrefix)))
                 { //If this folder has an AOL_prefix then log the mail items contained and then delete them
-                    DeleteAndLog(fol);
+                    DeleteAndLog(txn, fol);
                 }
-                HandleFolder(fol);
+                HandleFolder(txn, fol);
             }
         }
 
-        private void DeleteAndLog(Outlook.Folder folder)
+        private void DeleteAndLog(SqlTransaction txn, Outlook.Folder folder)
         {
             int itemsLoggedInfolder = 0;
             string sourceFolder = folder.FolderPath;
@@ -96,7 +96,7 @@ namespace AOL_Logger
                     string subject = mail.Subject;
                     string body = mail.Body;
                     DateTime timestamp = mail.ReceivedTime;
-                    itemsLoggedInfolder += LogEmail(sourceFolder, subject, body, timestamp);
+                    itemsLoggedInfolder += LogEmail(txn, sourceFolder, subject, body, timestamp);
                     mailItems.Push(mail);
                 }
                 catch (Exception e)
@@ -118,20 +118,30 @@ namespace AOL_Logger
             log.Error(string.Format("{0}\n{1}", e.Message, e.StackTrace));
         }
 
-        private int LogEmail(string SourceFolder, string Subject, string Body, DateTime RecieptTime)
+        private int LogEmail(SqlTransaction txn, string SourceFolder, string Subject, string Body, DateTime RecieptTime)
         {
-            preparedInsert.Parameters[0].Value = SourceFolder;
-            preparedInsert.Parameters[1].Value = Subject;
-            preparedInsert.Parameters[2].Value = Body;
-            preparedInsert.Parameters[3].Value = RecieptTime;
-
-            preparedInsert.Prepare();
-            return preparedInsert.ExecuteNonQuery();
+            var logs = Regex.Split(Body, @"^\s*$[\r\n]*", RegexOptions.Multiline);
+            int entriesAdded = 0;
+            foreach (var log in logs)
+            {
+                if (!String.IsNullOrWhiteSpace(log))
+                {
+                    preparedInsert.Parameters[0].Value = SourceFolder;
+                    preparedInsert.Parameters[1].Value = Subject;
+                    preparedInsert.Parameters[2].Value = log;
+                    preparedInsert.Parameters[3].Value = RecieptTime;
+                    preparedInsert.Transaction = txn;
+                    preparedInsert.Prepare();
+                    entriesAdded += preparedInsert.ExecuteNonQuery();
+                }
+            }
+            return entriesAdded;
         }
 
-        private void DeleteOldLoggedEmails(DateTime DeletionDay)
+        private void DeleteOldLoggedEmails(SqlTransaction txn, DateTime DeletionDay)
         {
             preparedDelete.Parameters[0].Value = DeletionDay;
+            preparedDelete.Transaction = txn;
             preparedDelete.Prepare();
             log.Info(string.Format("{0} Rows dropped from the database.", preparedDelete.ExecuteNonQuery()));
         }
@@ -179,13 +189,13 @@ namespace AOL_Logger
                         System.Threading.Thread.Sleep(ms_between_aggregations);
 
                         myConnection.Open();
-
+                        var txn = myConnection.BeginTransaction();
                         InstantiateSqlPreparedStatement();
 
-                        HandleFolder(thisOutlookApplication.Session.DefaultStore.GetRootFolder() as Outlook.Folder);
+                        HandleFolder(txn, thisOutlookApplication.Session.DefaultStore.GetRootFolder() as Outlook.Folder);
 
-                        DeleteOldLoggedEmails(DateTime.Now.AddHours(-1 * HoursToKeep));
-
+                        if (HoursToKeep != 0) DeleteOldLoggedEmails(txn, DateTime.Now.AddHours(-1 * HoursToKeep));
+                        txn.Commit();
                         myConnection.Close();
                     }
                 }
